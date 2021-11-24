@@ -1,97 +1,172 @@
+#!/usr/bin/python3
+import random
 import board
 import copy
+import math
 from random import random as rand
 from random import randint
 import neopixel
 from time import sleep
-pixels = neopixel.NeoPixel(board.D18, 50, brightness=0.1)
-pixels.fill((0,0,0))
-sleep(1)
 i = 0
 
-locations = [821, 150,
-686, 161 ,
-774, 150 ,
-861, 162 ,
-922, 164 ,
-999, 240 ,
-938, 288 ,
-962, 377 ,
-888, 371 ,
-854, 376 ,
-768, 367 ,
-749, 368 ,
-652, 322 ,
-606, 408 ,
-529, 305 ,
-547, 346 ,
-570, 352 ,
-665, 282 ,
-717, 268 ,
-779, 379 ,
-834, 293 ,
-895, 409 ,
-956, 350 ,
-998, 400 ,
-972, 460 ,
-951, 499 ,
-850, 517 ,
-762, 419 ,
-728, 424 ,
-695, 437 ,
-621, 532 ,
-543, 525 ,
-465, 427 ,
-585, 490 ,
-648, 442 ,
-697, 472 ,
-732, 526 ,
-800, 572 ,
-854, 628 ,
-787, 679 ,
-793, 714 ,
-753, 622 ,
-697, 651 ,
-695, 567 ,
-589, 583 ,
-549, 484 ,
-503, 453 ,
-459, 418 ,
-387, 481 ,
-337, 365]
+def clamp(x):
+  return max(min(x, 1),0)
+bias = 0.3
 
-x = locations[0::2]
-y = locations[1::2]
+def random_walk(min_v, max_v, transition_speed = 0.1):
+  p = random.random()
+  while True:
+    direction = 1 if (random.random() < 0.5 + bias * (0.5 - p)) else -1
+    p = clamp(p+direction/10)
+    yield (p * (max_v-min_v)) + min_v
+
+momentum = random_walk(0,0)
+#drawdown = random_walk(0,0)
+drawdown = random_walk(.7,.95)
+speed = random_walk(0,0.1, 0.01)
+color_bias = [random_walk(0,255) for _ in range(3)] 
+light_positions = [
+[379, 155],
+[365, 155],
+[341, 106],
+[325, 164],
+[305, 108],
+[263, 131],
+[248, 172],
+[295, 158],
+[289, 183],
+[241, 157],
+[232, 209],
+[204, 219],
+[143, 197],
+[188, 243],
+[228, 211],
+[230, 250],
+[282, 251],
+[300, 263],
+[319, 308],
+[313, 332],
+[309, 366],
+[278, 383],
+[238, 347],
+[280, 310],
+[256, 310],
+[246, 281],
+[200, 256],
+[182, 271],
+[161, 298],
+[211, 267],
+[225, 312],
+[226, 362],
+[183, 328],
+[165, 383],
+[157, 372],
+[157, 407],
+[102, 378],
+[167, 374],
+[122, 393],
+[99, 387],
+[43, 380],
+[76, 424],
+[119, 418],
+[140, 374],
+[134, 446],
+[166, 460],
+[140, 477],
+[179, 445],
+[189, 421],
+[268, 447],
+[293, 454],
+[255, 484],
+[237, 498],
+[211, 499],
+[255, 503],
+[285, 496],
+[317, 460],
+[340, 476],
+[364, 474],
+[401, 459],
+[411, 444],
+[447, 446],
+[457, 430],
+[474, 420],
+[478, 393],
+[490, 370],
+[488, 357],
+[471, 324],
+[454, 288],
+[423, 277],
+[387, 284],
+[383, 235],
+[353, 215],
+[330, 215],
+[288, 215],
+[336, 230],
+[351, 223],
+[379, 256],
+[375, 276],
+[406, 301],
+[371, 324],
+[404, 362],
+[400, 391],
+[373, 404],
+[356, 450],
+[338, 456],
+[321, 457],
+[298, 488],
+[268, 511],
+[220, 475],
+[213, 524],
+[171, 533],
+[128, 528],
+[188, 532],
+[193, 557],
+[221, 535],
+[261, 550],
+[275, 574],
+[278, 580],
+[278, 577]]
+
+x = list(zip(*light_positions))[0]
+y = list(zip(*light_positions))[1]
 x = [(p-min(x))/(max(x)-min(x)) for p in x]
 y = [(p-min(y))/(max(y)-min(y)) for p in y]
 zero = [(0,0,0)] * len(x)
-lights = list(zip(range(len(locations)), x, y, zero))
+pixels = neopixel.NeoPixel(board.D18, len(x), brightness=.3)
+pixels.fill((0,0,0))
+pixels.show()
+lights = list(zip(range(len(x)), x, y, zero))
 
 transitions = [
         lambda l:l[1]*x_r + l[2]*y_r,
-        lambda l:abs(l[1]-x_r) + abs(l[2]-y_r),
+#        lambda l:abs(l[1]-x_r) + abs(l[2]-y_r),
         lambda l:pow(l[1]-x_r,2) + pow(l[2]-y_r,2),
-        lambda l:pow(l[1]-x_r,10) + pow(l[2]-y_r,10)
+#        lambda l:pow(l[1]-x_r,10) + pow(l[2]-y_r,10)
         ]
+
 def transition(lights):
     color = [randint(0,255), randint(0,255), randint(0,255)]
-    lights_s = list(sorted(copy.copy(lights), key = transitions[randint(0,len(transitions)-1)]))
+    bias_amount = min(rand(), rand())
+    color = [(1-bias_amount) * color[i] + bias_amount * next(color_bias[i]) for i in range(3)]
+    lights_s = list(sorted(copy.copy(lights), key = transitions[randint(0,len(transitions)-1)], reverse=True if rand() < 0.5 else False))
     for i in range(len(lights_s)):
-        print("Drawing from "+str(color))
-        yield (lights_s[i][0], color)
+#        print("Drawing from "+str(color))
+        yield (lights_s[i][0], color, 13-int(math.log2(randint(1,4096))))
 
 def ongoing_transitions(lights):
     trans = [transition(list(lights)) for _ in range(2)]
     i = 0
     while True:
-        if rand() < (0.8/(len(lights)+2)) or len(trans) == 0:
+        if rand() < (next(drawdown)/len(lights)) or len(trans) == 0:
             trans.append(transition(list(lights)))
+    #        pixels.fill((0,0,0))
+            #print(f"Now have {len(trans)} pattens ongoing")
         try:
-            print(f"transition {i}/{len(trans)}")
-            yield next(trans[i])
+#            print(f"transition {i}/{len(trans)}")
+            yield (next(trans[i]), len(trans))
         except StopIteration:
             trans.pop(i)
-            pass
+            #print(f"Now have {len(trans)} pattens ongoing")
         i += 1
         if i >= len(trans):
             i = 0
@@ -102,12 +177,20 @@ while True:
 #    lights = sorted(lights, key = transitions[randint(0,len(transitions)-1)])
     #print(f"Resorting by {x_r} {y_r}, ended with {lights}")
     ong = ongoing_transitions(lights)
-    for i, color in ong:
+    count = 0
+    for (i, color, strength), num_trans in ong:
             l_no = lights[i][0]
-            current_val = [(color[j] + 3*lights[i][3][j])//4 for j in range(3)]
+            mom = next(momentum)
+            current_val = [int((strength * color[j] + mom * lights[i][3][j])/(strength+mom)) for j in range(3)]
             lights[i] = (lights[i][0], lights[i][1], lights[i][2],tuple(current_val))
             pixels[l_no] = tuple(current_val)
+#            if count % 100 == 0:
+#            print(f"Writing light{l_no}")
+#            if count % 1000 == 0:
+                #print(f"speed={next(speed)} mom={next(momentum)}, drawdown={next(drawdown)}, color_bias = {list(next(color_bias[i]) for i in range(3))}")
+#                pixels.fill((0,0,0))
             pixels.show()
-#            sleep(0.015)
+            sleep(next(speed)/num_trans)
+            count += 1
     #        pixels[l_no] = (0,0,0)
 
