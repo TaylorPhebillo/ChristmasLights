@@ -20,8 +20,6 @@ def random_walk(min_v, max_v, transition_speed = 0.1):
     p = clamp(p+direction/10)
     yield (p * (max_v-min_v)) + min_v
 
-momentum = random_walk(0,0)
-#drawdown = random_walk(0,0)
 drawdown = random_walk(.7,.95)
 speed = random_walk(0,0.1, 0.01)
 color_bias = [random_walk(0,255) for _ in range(3)] 
@@ -139,19 +137,16 @@ lights = list(zip(range(len(x)), x, y, zero))
 
 transitions = [
         lambda l:l[1]*x_r + l[2]*y_r,
-#        lambda l:abs(l[1]-x_r) + abs(l[2]-y_r),
         lambda l:pow(l[1]-x_r,2) + pow(l[2]-y_r,2),
-#        lambda l:pow(l[1]-x_r,10) + pow(l[2]-y_r,10)
         ]
 
 def transition(lights):
     color = [randint(0,255), randint(0,255), randint(0,255)]
     bias_amount = min(rand(), rand())
-    color = [(1-bias_amount) * color[i] + bias_amount * next(color_bias[i]) for i in range(3)]
+    color = [int((1-bias_amount) * color[i] + bias_amount * next(color_bias[i])) for i in range(3)]
     lights_s = list(sorted(copy.copy(lights), key = transitions[randint(0,len(transitions)-1)], reverse=True if rand() < 0.5 else False))
     for i in range(len(lights_s)):
-#        print("Drawing from "+str(color))
-        yield (lights_s[i][0], color, 13-int(math.log2(randint(1,4096))))
+        yield (lights_s[i][0], color)
 
 def ongoing_transitions(lights):
     trans = [transition(list(lights)) for _ in range(2)]
@@ -159,14 +154,10 @@ def ongoing_transitions(lights):
     while True:
         if rand() < (next(drawdown)/len(lights)) or len(trans) == 0:
             trans.append(transition(list(lights)))
-    #        pixels.fill((0,0,0))
-            #print(f"Now have {len(trans)} pattens ongoing")
         try:
-#            print(f"transition {i}/{len(trans)}")
             yield (next(trans[i]), len(trans))
         except StopIteration:
             trans.pop(i)
-            #print(f"Now have {len(trans)} pattens ongoing")
         i += 1
         if i >= len(trans):
             i = 0
@@ -174,23 +165,11 @@ def ongoing_transitions(lights):
 while True:
     x_r = rand() - 0.5
     y_r = rand() - 0.5
-#    lights = sorted(lights, key = transitions[randint(0,len(transitions)-1)])
-    #print(f"Resorting by {x_r} {y_r}, ended with {lights}")
     ong = ongoing_transitions(lights)
-    count = 0
-    for (i, color, strength), num_trans in ong:
+    for (i, color), num_trans in ong:
             l_no = lights[i][0]
-            mom = next(momentum)
-            current_val = [int((strength * color[j] + mom * lights[i][3][j])/(strength+mom)) for j in range(3)]
-            lights[i] = (lights[i][0], lights[i][1], lights[i][2],tuple(current_val))
-            pixels[l_no] = tuple(current_val)
-#            if count % 100 == 0:
-#            print(f"Writing light{l_no}")
-#            if count % 1000 == 0:
-                #print(f"speed={next(speed)} mom={next(momentum)}, drawdown={next(drawdown)}, color_bias = {list(next(color_bias[i]) for i in range(3))}")
-#                pixels.fill((0,0,0))
+            lights[i] = (lights[i][0], lights[i][1], lights[i][2],tuple(color))
+            pixels[l_no] = color
             pixels.show()
             sleep(next(speed)/num_trans)
-            count += 1
-    #        pixels[l_no] = (0,0,0)
 
